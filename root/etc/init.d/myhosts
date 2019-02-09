@@ -1,0 +1,62 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+
+ENABLED=0
+
+myhosts_header() {
+	local enabled
+	config_get enabled $1 enabled
+	ENABLED=$enabled
+}
+
+add_hosts() {
+	local ip
+	local domain
+
+	config_get ip $1 ip
+	config_get domain $1 domain
+
+    echo "$ip $domain"
+    echo "$ip $domain" >> /etc/myhosts
+}
+
+start() {
+	config_load myhosts
+	config_foreach myhosts_header myhosts
+
+	echo "Checking..."
+
+	if [ $ENABLED == 1 ]
+	then {
+		echo "myhosts Mount is Enabled."
+		echo "Starting..."
+
+		config_foreach add_hosts domain
+        uci add_list dhcp.@dnsmasq[0].addnhosts='/etc/myhosts'
+        uci commit dhcp
+        /etc/init.d/dnsmasq reload
+
+		echo "MyHosts succeed."
+		}
+	else
+		echo "MyHosts is Disabled."
+	fi
+}
+
+stop() {
+	echo "Disabling..."
+
+    uci del_list dhcp.@dnsmasq[0].addnhosts='/etc/myhosts'
+    uci commit dhcp
+    /etc/init.d/dnsmasq reload
+    rm /etc/myhosts >/dev/null 2>&1
+
+	echo "MyHosts Disabled."
+
+}
+
+restart() {
+    stop
+    start
+}
